@@ -1,0 +1,8 @@
+streamlit
+groq
+gspread
+oauth2client
+python-dotenv
+pandas
+pillow
+google-generativeai
