@@ -1,6 +1,6 @@
 """
 Raayna Enterprises - Complete Website + Embedded Chatbot
-Single-page: hero, services, why-us, embedded chatbot, contact.
+Clean media display: URLs hidden, actual photos + videos shown.
 """
 import re
 import streamlit as st
@@ -284,10 +284,87 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
+
+# ============================================================
+# HELPER: Extract media URLs from a reply
+# ============================================================
+def extract_media_urls(text: str):
+    """
+    Extract image and video URLs from the bot's reply.
+    Returns (list_of_image_urls, list_of_video_urls).
+    Works with Drive and Cloudinary URLs.
+    """
+    # Collect all URLs
+    url_pattern = r'https?://[^\s\)\]\}"\'<>]+'
+    all_urls = re.findall(url_pattern, text)
+
+    image_urls = []
+    video_urls = []
+    seen = set()
+
+    for url in all_urls:
+        # Clean trailing punctuation
+        url = url.rstrip('.,;:')
+        if url in seen:
+            continue
+        seen.add(url)
+
+        low = url.lower()
+
+        # Cloudinary images
+        if "res.cloudinary.com" in url and "/image/upload/" in url:
+            image_urls.append(url)
+            continue
+
+        # Cloudinary videos
+        if "res.cloudinary.com" in url and "/video/upload/" in url:
+            video_urls.append(url)
+            continue
+
+        # Drive file links
+        if "drive.google.com" in url:
+            m = re.search(r'/d/([A-Za-z0-9_-]{20,})', url) or \
+                re.search(r'[?&]id=([A-Za-z0-9_-]{20,})', url)
+            if m:
+                fid = m.group(1)
+                # Guess type from extension in URL
+                if any(ext in low for ext in [".mp4", ".mov", ".webm", ".avi"]):
+                    video_urls.append(f"https://drive.google.com/file/d/{fid}/preview")
+                else:
+                    image_urls.append(
+                        f"https://drive.google.com/thumbnail?id={fid}&sz=w1000"
+                    )
+            continue
+
+        # Direct image extensions
+        if any(low.endswith(ext) for ext in [".jpg", ".jpeg", ".png", ".webp", ".gif"]):
+            image_urls.append(url)
+            continue
+
+        # Direct video extensions
+        if any(low.endswith(ext) for ext in [".mp4", ".mov", ".webm", ".avi"]):
+            video_urls.append(url)
+            continue
+
+    return image_urls, video_urls
+
+
+def clean_reply_of_urls(text: str) -> str:
+    """Remove URL strings from a reply, leaving readable text."""
+    url_pattern = r'https?://[^\s\)\]\}"\'<>]+'
+    cleaned = re.sub(url_pattern, '', text)
+    # Clean up leftover whitespace and empty lines
+    cleaned = re.sub(r'\n\s*\n\s*\n+', '\n\n', cleaned)
+    cleaned = re.sub(r'[ \t]+', ' ', cleaned)
+    return cleaned.strip()
+
+
+# ============================================================
+# CHAT STATE
+# ============================================================
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Welcome + quick replies
 if not st.session_state.messages:
     with st.chat_message("assistant", avatar="🏢"):
         st.markdown(
@@ -326,13 +403,49 @@ if not st.session_state.messages:
             })
             st.rerun()
 
-# Chat history
+
+# ============================================================
+# DISPLAY CHAT HISTORY
+# ============================================================
 for message in st.session_state.messages:
     avatar = "🏢" if message["role"] == "assistant" else "👤"
     with st.chat_message(message["role"], avatar=avatar):
-        st.markdown(message["content"])
+        if message["role"] == "assistant":
+            # Clean URLs from displayed text
+            imgs, vids = extract_media_urls(message["content"])
+            clean_text = clean_reply_of_urls(message["content"])
 
-# Chat input
+            if clean_text:
+                st.markdown(clean_text)
+            elif imgs or vids:
+                st.markdown("Here are the photos of the property:")
+
+            # Show images
+            if imgs:
+                num_cols = min(len(imgs), 3)
+                for row_start in range(0, len(imgs), num_cols):
+                    cols = st.columns(num_cols)
+                    for i, url in enumerate(imgs[row_start:row_start + num_cols]):
+                        with cols[i]:
+                            try:
+                                st.image(url, use_container_width=True)
+                            except Exception:
+                                pass
+
+            # Show videos
+            if vids:
+                for url in vids:
+                    try:
+                        st.video(url)
+                    except Exception:
+                        st.markdown(f"[🎥 Watch video]({url})")
+        else:
+            st.markdown(message["content"])
+
+
+# ============================================================
+# CHAT INPUT
+# ============================================================
 if prompt := st.chat_input("Type your message..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user", avatar="👤"):
@@ -342,31 +455,39 @@ if prompt := st.chat_input("Type your message..."):
         with st.spinner("Thinking..."):
             history_for_bot = st.session_state.messages[:-1]
             response = chat(prompt, history_for_bot)
-            st.markdown(response)
 
-            # ---- Detect Google Drive image URLs and render as thumbnails ----
-            img_pattern = r'https://drive\.google\.com/(?:file/d/|uc\?export=view&id=|thumbnail\?id=)([A-Za-z0-9_-]{20,})'
-            found_ids = re.findall(img_pattern, response)
+            # Extract media
+            imgs, vids = extract_media_urls(response)
+            clean_text = clean_reply_of_urls(response)
 
-            # Remove duplicates, keep order
-            seen = set()
-            unique_ids = []
-            for fid in found_ids:
-                if fid not in seen:
-                    seen.add(fid)
-                    unique_ids.append(fid)
+            # Show text
+            if clean_text:
+                st.markdown(clean_text)
+            elif imgs or vids:
+                st.markdown("Here are the photos of the property:")
 
-            if unique_ids:
-                st.markdown("### 📸 Property Images")
-                num_cols = 3
-                for row_start in range(0, len(unique_ids[:5]), num_cols):
+            # Show images as actual photos
+            if imgs:
+                num_cols = min(len(imgs), 3)
+                for row_start in range(0, len(imgs), num_cols):
                     cols = st.columns(num_cols)
-                    for i, file_id in enumerate(unique_ids[row_start:row_start + num_cols]):
-                        thumb_url = f"https://drive.google.com/thumbnail?id={file_id}&sz=w1000"
+                    for i, url in enumerate(imgs[row_start:row_start + num_cols]):
                         with cols[i]:
-                            st.image(thumb_url, use_container_width=True)
+                            try:
+                                st.image(url, use_container_width=True)
+                            except Exception:
+                                pass
+
+            # Show videos
+            if vids:
+                for url in vids:
+                    try:
+                        st.video(url)
+                    except Exception:
+                        st.markdown(f"[🎥 Watch video]({url})")
 
     st.session_state.messages.append({"role": "assistant", "content": response})
+
 
 # ============================================================
 # CONTACT
