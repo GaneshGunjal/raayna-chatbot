@@ -18,10 +18,7 @@ def _get_client():
     ]
     
     try:
-        # Load Streamlit dynamically so this helper also works outside the
-        # Streamlit environment without requiring it as an import-time dependency.
-        import importlib
-        st = importlib.import_module("streamlit")
+        import streamlit as st
         creds_dict = dict(st.secrets["gcp_service_account"])
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
     except Exception:
@@ -78,8 +75,9 @@ def search_rentals(location: str = "", bhk: str = "", max_rent: str = ""):
 
         if location:
             loc_clean = _normalize_location(location)
-            row_loc_clean = _normalize_location(row.get("location", ""))
-            if loc_clean not in row_loc_clean:
+            row_loc = _normalize_location(row.get("location", ""))
+            row_title = _normalize_location(row.get("title", ""))
+            if loc_clean not in row_loc and loc_clean not in row_title:
                 continue
 
         if bhk:
