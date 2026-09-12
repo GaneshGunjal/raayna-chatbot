@@ -1,0 +1,11 @@
+# Streamlit secrets & Google Credentials
+.env
+service_account.json
+.streamlit/secrets.toml
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/

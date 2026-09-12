@@ -1,0 +1,40 @@
+define user greet
+  "hi"
+  "hello"
+  "namaste"
+  "hey"
+  "good morning"
+  "good evening"
+
+define user ask services
+  "what services do you offer"
+  "tell me about your company"
+  "what do you do"
+  "how can you help me"
+
+define user is owner
+  "I have a property"
+  "I own a flat"
+  "I want to rent out my property"
+  "manage my property"
+  "I am an NRI owner"
+
+define user is tenant
+  "I need a flat"
+  "I am looking for a rental"
+  "show me properties"
+  "I want to buy a property"
+
+define bot greet_response
+  "Namaste! 🙏 Welcome to Raayna Enterprises. I help property owners in Pune manage their properties hassle-free — whether you're local or abroad. Are you:\n1️⃣ A property owner\n2️⃣ Looking for a property\n3️⃣ An NRI owner"
+
+define bot services_response
+  "We offer complete property management in Pune:\n✅ Property Marketing\n✅ Tenant Management\n✅ Maintenance & Repairs\n✅ Rent Collection & Accounting\n✅ Property Inspection\n✅ Free Consultation\n\nWould you like to book a free consultation? Call 7773933417."
+
+define flow greeting
+  user greet
+  bot greet_response
+
+define flow show_services
+  user ask services
+  bot services_response
