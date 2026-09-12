@@ -16,9 +16,19 @@ def _get_client():
         "https://spreadsheets.google.com/feeds",
         "https://www.googleapis.com/auth/drive"
     ]
-    creds = ServiceAccountCredentials.from_json_keyfile_name(
-        "service_account.json", scope
-    )
+    
+    try:
+        # Load Streamlit dynamically so this helper also works outside the
+        # Streamlit environment without requiring it as an import-time dependency.
+        import importlib
+        st = importlib.import_module("streamlit")
+        creds_dict = dict(st.secrets["gcp_service_account"])
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+    except Exception:
+        creds = ServiceAccountCredentials.from_json_keyfile_name(
+            "service_account.json", scope
+        )
+    
     return gspread.authorize(creds)
 
 
