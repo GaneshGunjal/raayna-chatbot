@@ -1,6 +1,6 @@
 """
 Raayna Enterprises - Complete Website + Embedded Chatbot
-Clean media display: URLs hidden, actual photos + videos shown.
+Single-page website with clean media display + admin access.
 """
 import re
 import streamlit as st
@@ -13,7 +13,7 @@ st.set_page_config(
     page_title="Raayna Enterprises | Property Management Pune",
     page_icon="🏢",
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="expanded"
 )
 
 # ============================================================
@@ -42,6 +42,7 @@ st.markdown("""
         align-items: center;
         margin-bottom: 24px;
         box-shadow: 0 4px 14px rgba(13,33,55,0.18);
+        height: 60px;
     }
     .topnav .brand { font-size: 20px; font-weight: 700; letter-spacing: 0.3px; }
     .topnav .brand span { color: #d4a843; }
@@ -184,14 +185,51 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ============================================================
-# TOP NAV
+# SIDEBAR
 # ============================================================
-st.markdown("""
-<div class="topnav">
-    <div class="brand">🏢 Raayna <span>Enterprises</span></div>
-    <div class="nav-links">Property Management • Pune</div>
-</div>
-""", unsafe_allow_html=True)
+with st.sidebar:
+    st.markdown("### 🏢 Raayna Enterprises")
+    st.caption("Property Management • Pune")
+    st.divider()
+
+    st.markdown("#### 📞 Contact")
+    st.markdown("""
+    - 📱 7773933417
+    - 📱 7378567707
+    - 📧 raaynaenterprises@gmail.com
+    - 🌐 [raaynaenterprises.in](https://www.raaynaenterprises.in)
+    """)
+
+    st.divider()
+    st.markdown("#### ✅ Our Services")
+    st.markdown("""
+    - 🏠 Property Marketing
+    - 👥 Tenant Management
+    - 🔧 Maintenance & Repairs
+    - 💰 Rent Collection
+    - 🔍 Property Inspection
+    - 🎁 Free Consultation
+    """)
+
+    st.divider()
+    st.page_link("pages/1_Admin.py", label="🔐 Admin Dashboard", use_container_width=True)
+
+# ============================================================
+# TOP NAV (with Admin link inside)
+# ============================================================
+nav_col1, nav_col2 = st.columns([5, 1])
+
+with nav_col1:
+    st.markdown("""
+    <div class="topnav">
+        <div class="brand">🏢 Raayna <span>Enterprises</span></div>
+        <div class="nav-links">Property Management • Pune</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+with nav_col2:
+    st.markdown("<div style='height: 10px;'></div>", unsafe_allow_html=True)
+    st.page_link("pages/1_Admin.py", label="🔐 Admin", use_container_width=True)
 
 # ============================================================
 # HERO
@@ -286,15 +324,10 @@ st.markdown("""
 
 
 # ============================================================
-# HELPER: Extract media URLs from a reply
+# HELPERS: Media extraction and cleanup
 # ============================================================
 def extract_media_urls(text: str):
-    """
-    Extract image and video URLs from the bot's reply.
-    Returns (list_of_image_urls, list_of_video_urls).
-    Works with Drive and Cloudinary URLs.
-    """
-    # Collect all URLs
+    """Extract image and video URLs from the bot's reply."""
     url_pattern = r'https?://[^\s\)\]\}"\'<>]+'
     all_urls = re.findall(url_pattern, text)
 
@@ -303,7 +336,6 @@ def extract_media_urls(text: str):
     seen = set()
 
     for url in all_urls:
-        # Clean trailing punctuation
         url = url.rstrip('.,;:')
         if url in seen:
             continue
@@ -311,23 +343,18 @@ def extract_media_urls(text: str):
 
         low = url.lower()
 
-        # Cloudinary images
         if "res.cloudinary.com" in url and "/image/upload/" in url:
             image_urls.append(url)
             continue
-
-        # Cloudinary videos
         if "res.cloudinary.com" in url and "/video/upload/" in url:
             video_urls.append(url)
             continue
 
-        # Drive file links
         if "drive.google.com" in url:
             m = re.search(r'/d/([A-Za-z0-9_-]{20,})', url) or \
                 re.search(r'[?&]id=([A-Za-z0-9_-]{20,})', url)
             if m:
                 fid = m.group(1)
-                # Guess type from extension in URL
                 if any(ext in low for ext in [".mp4", ".mov", ".webm", ".avi"]):
                     video_urls.append(f"https://drive.google.com/file/d/{fid}/preview")
                 else:
@@ -336,12 +363,9 @@ def extract_media_urls(text: str):
                     )
             continue
 
-        # Direct image extensions
         if any(low.endswith(ext) for ext in [".jpg", ".jpeg", ".png", ".webp", ".gif"]):
             image_urls.append(url)
             continue
-
-        # Direct video extensions
         if any(low.endswith(ext) for ext in [".mp4", ".mov", ".webm", ".avi"]):
             video_urls.append(url)
             continue
@@ -353,7 +377,6 @@ def clean_reply_of_urls(text: str) -> str:
     """Remove URL strings from a reply, leaving readable text."""
     url_pattern = r'https?://[^\s\)\]\}"\'<>]+'
     cleaned = re.sub(url_pattern, '', text)
-    # Clean up leftover whitespace and empty lines
     cleaned = re.sub(r'\n\s*\n\s*\n+', '\n\n', cleaned)
     cleaned = re.sub(r'[ \t]+', ' ', cleaned)
     return cleaned.strip()
@@ -411,7 +434,6 @@ for message in st.session_state.messages:
     avatar = "🏢" if message["role"] == "assistant" else "👤"
     with st.chat_message(message["role"], avatar=avatar):
         if message["role"] == "assistant":
-            # Clean URLs from displayed text
             imgs, vids = extract_media_urls(message["content"])
             clean_text = clean_reply_of_urls(message["content"])
 
@@ -420,7 +442,6 @@ for message in st.session_state.messages:
             elif imgs or vids:
                 st.markdown("Here are the photos of the property:")
 
-            # Show images
             if imgs:
                 num_cols = min(len(imgs), 3)
                 for row_start in range(0, len(imgs), num_cols):
@@ -432,13 +453,12 @@ for message in st.session_state.messages:
                             except Exception:
                                 pass
 
-            # Show videos
             if vids:
                 for url in vids:
                     try:
                         st.video(url)
                     except Exception:
-                        st.markdown(f"[🎥 Watch video]({url})")
+                        pass
         else:
             st.markdown(message["content"])
 
@@ -456,17 +476,14 @@ if prompt := st.chat_input("Type your message..."):
             history_for_bot = st.session_state.messages[:-1]
             response = chat(prompt, history_for_bot)
 
-            # Extract media
             imgs, vids = extract_media_urls(response)
             clean_text = clean_reply_of_urls(response)
 
-            # Show text
             if clean_text:
                 st.markdown(clean_text)
             elif imgs or vids:
                 st.markdown("Here are the photos of the property:")
 
-            # Show images as actual photos
             if imgs:
                 num_cols = min(len(imgs), 3)
                 for row_start in range(0, len(imgs), num_cols):
@@ -478,13 +495,12 @@ if prompt := st.chat_input("Type your message..."):
                             except Exception:
                                 pass
 
-            # Show videos
             if vids:
                 for url in vids:
                     try:
                         st.video(url)
                     except Exception:
-                        st.markdown(f"[🎥 Watch video]({url})")
+                        pass
 
     st.session_state.messages.append({"role": "assistant", "content": response})
 
